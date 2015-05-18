@@ -15,6 +15,20 @@ var flash = require('connect-flash');
 var config = require('./config/config');
 var io = require('socket.io').listen(config.socketPort);
 
+var enableCORS = function(req, res, next) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, *');
+
+        // intercept OPTIONS method
+    if ('OPTIONS' == req.method) {
+        res.send(200);
+    } else {
+        next();
+    };
+};
+app.use(enableCORS);
+
 io.sockets.on('connection', function(socket){
 	socket.on('join',function(data){
 		io.sockets.emit('userJoined',data);
@@ -30,6 +44,57 @@ io.sockets.on('connection', function(socket){
 			done('ack');
 		});
 	});
+
+	socket.on('message',function(message){
+		log( 'S --> Got message: ' , message );
+		socket.boardcast.to(message.channel).emit('message', message.message);
+	});
+
+	socket.on('create or join',function(channel){
+		console.log(socket.id);
+		// for (var socketId in io.nsps['/'].adapter.rooms[channel]) {
+		// 	console.log(socketId);
+		// }
+		// var numclients = io.sockets.clients(channel).length;
+		// console.log('number client = ' + numclients);
+
+		// if(numclients == 0){
+		// 	socket.join(channel);
+		// 	socket.emit('created',channel);
+		// }
+		// else if(numclients == 1){
+		// 	io.sockets.in(channel).emit('remotePeerJoining',channel);
+		// 	socket.join(channel);
+		// 	socket.boardcast.to(channel).emit('boardcast: joined','S --> broadcast(): client ' + socket.id + ' joined channel ' + channel);
+		// }
+		// else {
+		// 	console.log("channel full");
+		// 	socket.emit('full',channel);
+		// }
+	});
+
+	socket.on('response',function(response){
+		log('S ---> Got response', response);
+		socket.boardcast.to(response.channel).emit('response',response.message);
+	});
+
+	socket.on('Bye',function(channel){
+		socket.boardcast.to(channel).emit('Bye');
+		socket.disconnect();
+	});
+
+	socket.on('Ack', function(){
+		console.log('Got an Ack');
+		socket.disconnect();
+	});
+
+	function log(){
+		var array = [">>> "];
+		for(var i = 0; i< arguments.length; i++){
+			array.push(arguments[i]);
+		}
+		socket.emit('log',array);
+	}
 })
 // app.get('*',function(req,res){
 // 	res.send("Express");
